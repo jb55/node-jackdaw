@@ -1,12 +1,29 @@
 
-{ parseStack } = require './raven-utils'
 async = require 'async'
+fs    = require 'fs'
+url   = require 'url'
+crypto = require 'crypto'
+{ _ } = require 'underscore'
 
 util = module.exports
 
+#
+# Parses a dsn string:
+#
+#   https://public:secret@example.com/sentry/1
+# 
+# ... into a javascript object in the form:
+#
+#   uri: 'https://example.com/sentry'
+#   publicKey: public
+#   secretSecret: secret
+#   projectId: 1
+#
+# This function throws exceptions if the parse fails in any way
+#
 util.parseDsn = (dsn) ->
   { hostname, pathname, protocol, auth } = url.parse dsn
-  [ publicKey, secret ] = auth.split ':'
+  [ publicKey, secretKey ] = auth.split ':'
   parsedPath            = pathname.split '/'
 
   if parsedPath.length is 0
@@ -25,9 +42,8 @@ util.parseDsn = (dsn) ->
 
   uri: "#{ protocol or 'http' }//#{ hostname }/#{ path }"
   public: publicKey
-  secret: secret
+  secret: secretKey
   projectId: projectId
-
 
 #
 # read line contexts from errors
@@ -38,17 +54,19 @@ util.getLineContext = (file, lineno, cb, numContext=2) ->
   fs.readFile file, (err, data) ->
     return cb err if err
     lines = data.toString().split('\n')
-    contextLine = ln linenno
+    contextLine = ln lineno
     cb null,
-      pre_context:  lines[contextLine - numContext .. contextLine]
-      context_line: lines[contextLine]
-      post_context: lines[contextLine .. contextLine + numContext]
+      pre_context:  lines[lineno - numContext - 2 .. lineno - 2]
+      context_line: lines[lineno - 1]
+      post_context: lines[lineno .. lineno + numContext]
 
 #
 # parse a line from a string stack frame
 #
 util.parseStackTraceLine = (line) ->
-  [fn, filename, lineno] = line.match(/^\s*at (.+?) \((.+?):(\d+):(\d+)\)$/)[1..]
+  matched = line.match(/^\s*at (.+?) \((.+?):(\d+):(\d+)\)$/)
+  return null if matched is null
+  #[fn, filename, lineno] = [1..]
   frame =
     filename: filename
     lineno: lineno
@@ -64,11 +82,15 @@ util.parseStackTrace = (stack, cb) ->
 
   async.map lines, (line, done) ->
     frame = util.parseStackTraceLine line
+    return done null, frame if util.cantGetLineContext frame.filename
     util.getLineContext frame.filename, frame.lineno, (err, context) ->
       frame = _.extend frame, context
       done err, frame
   , (err, frames) ->
     cb err, frames
+
+util.cantGetLineContext = (f) ->
+  f and f.length > 0 and f[0] isnt '/'
 
 #
 # build a sentry stack frame from a raw stack frame
@@ -79,12 +101,13 @@ util.buildStackFrame = (opts, done) ->
   context = context or true
 
   frame =
-    filename: file
+    filename: callsite.file
     abs_path: callsite.path
     lineno: callsite.line
   frame["function"] = callsite.name
 
   if context
+    return done null, frame if util.cantGetLineContext frame.abs_path
     util.getLineContext frame.abs_path, frame.lineno, (err, ctx) ->
       frame = _.extend frame, ctx
       done err, frame
@@ -98,6 +121,9 @@ util.buildStackTrace = (opts, cb) ->
   { err, context } = opts
   err = err or opts
   context = context or true
+
+  # reading the stack string should trigger the prepare
+  s = err.stack
 
   ret = (err, frames) ->
     return cb err if err
@@ -114,7 +140,8 @@ util.buildStackTrace = (opts, cb) ->
   else
     # fall back to parsing a string stack trace if we dont have the raw
     # stacktrace for some reason
-    util.parseStackTrace err.stack, ret
+    ret new Error("Stack trace not found")
+    #util.parseStackTrace err.stack, ret
 
 
 #
@@ -129,14 +156,19 @@ util.buildCulprit = (frame) ->
   "#{ frame.filename } - #{ frame["function"] }"
 
 
-util.makeSignature = (timestamp, message) ->
-    hmac = crypto.createHmac 'sha1', key
-    hmac.update "#{ timestamp } #{ message }"
+util.makeSignature = (timestamp, message, secretKey) ->
+    hmac = crypto.createHmac 'sha1', secretKey
+    data = "#{ timestamp } #{ message }"
+    hmac.update data
     hmac.digest 'hex'
 
-util.makeAuthHeader = (sig, timestamp, apiKey) ->
-    header = ["Sentry sentry_signature=#{ signature }"]
+util.makeAuthHeader = (sig, timestamp, publicKey, p) ->
+    console.log publicKey
+    header = ["Sentry sentry_signature=#{ sig }"]
+    header.push "sentry_version=2.0"
     header.push "sentry_timestamp=#{ timestamp }"
     header.push "sentry_client=node-jackdaw/0.1"
-    header.push "sentry_key=#{ apiKey }" if apiKey
+    header.push "sentry_key=#{ publicKey }"
+    header.push "project_id=#{ p }"
     header.join ', '
+

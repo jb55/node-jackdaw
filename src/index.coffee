@@ -4,53 +4,17 @@ url   = require 'url'
 uuid  = require('node-uuid').v4
 raw   = require 'raw-stacktrace'
 os    = require 'os'
+request = require 'request'
+util  = require './util'
+zlib  = require 'zlib'
 
 (->
-  trace = raw()
-  trace.on 'trace', (err, callsites) ->
+  st = raw()
+  st.on 'trace', (err, callsites) ->
     err.callsites = callsites
 )()
 
 ex = module.exports
-
-#
-# Parses a dsn string:
-#
-#   https://public:secret@example.com/sentry/1
-# 
-# ... into a javascript object in the form:
-#
-#   uri: 'https://example.com/sentry'
-#   publicKey: public
-#   secretSecret: secret
-#   projectId: 1
-#
-# This function throws exceptions if the parse fails in any way
-#
-ex.parseDsn = (dsn) ->
-  { hostname, pathname, protocol, auth } = url.parse dsn
-  [ publicKey, secretKey ] = auth.split ':'
-  parsedPath            = pathname.split '/'
-
-  if parsedPath.length is 0
-    throw new Error 'Project id missing from dsn'
-
-  projectId = +parsedPath.pop()
-
-  if isNaN projectId
-    throw new Error 'Project id is not a number'
-
-  path         = parsedPath.join '/'
-  hasProjectId = projectId?
-
-  path      = ""   unless hasProjectId
-  projectId = path unless hasProjectId
-
-  uri: "#{ protocol or 'http' }//#{ hostname }/#{ path }"
-  publicKey: publicKey
-  secretKey: secretKey
-  projectId: projectId
-
 
 #
 # Events are passed as json packets to sentry servers
@@ -74,10 +38,13 @@ class Event
       message = null
 
     event.error err, (e, frames) ->
-      return cb e if e
-      event.culprit = util.buildCulprit frames[0]
-      event.message = message or e.message
-      cb null, event
+      if frames and frames.length > 0
+        event.culprit = util.buildCulprit frames[0]
+      else
+        event.culprit = "Unknown" unless frames
+
+      event.message = message or err.message
+      cb and cb null, event
 
   error: (err, cb) ->
     @exception err
@@ -85,7 +52,7 @@ class Event
     @
 
   stacktrace: (err, cb) ->
-    util.buildStackTrace err, (err, frames) ->
+    util.buildStackTrace err, (err, frames) =>
       return cb err if err
       @interface "Stacktrace", frames
       cb null, frames
@@ -106,7 +73,9 @@ class Event
 class Client
   constructor: (opts={}) ->
     if typeof opts is 'string'
-      opts = parseDsn opts
+      if opts is ""
+        throw new Error "Invalid DSN"
+      opts = util.parseDsn opts
 
     { uri, public, secret, projectId } = opts
     @uri       = uri
@@ -114,7 +83,36 @@ class Client
     @secret    = secret
     @projectId = projectId
 
-  @send: (event) ->
+    if not @uri or not @public or not @secret or not @projectId
+      throw new Error("Invalid configuration")
+
+  send: (event, cb) ->
+    event.project = event.project or @projectId
+    json = JSON.stringify event
+    zlib.deflate json, (err, buff) =>
+      return cb err if err
+      encoded = buff.toString('base64')
+      timestamp = new Date().getTime()
+      sig = util.makeSignature timestamp, encoded, @secret
+      authHead = util.makeAuthHeader sig, timestamp, @public, @projectId
+
+      headers =
+        'X-Sentry-Auth': authHead
+        'Content-Type': 'application/octet-stream'
+        'Content-Length': encoded.length
+
+      uri = "#{ @uri }api/store/"
+
+      request
+        uri: uri
+        headers: headers
+        method: "POST"
+        body: encoded
+      , (err, resp, body) ->
+        return cb && cb err, resp, body
+
+
 
 ex.Client = Client
 ex.Event = Event
+ex.util = util
