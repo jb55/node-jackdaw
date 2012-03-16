@@ -163,7 +163,6 @@ util.makeSignature = (timestamp, message, secretKey) ->
     hmac.digest 'hex'
 
 util.makeAuthHeader = (sig, timestamp, publicKey, p) ->
-    console.log publicKey
     header = ["Sentry sentry_signature=#{ sig }"]
     header.push "sentry_version=2.0"
     header.push "sentry_timestamp=#{ timestamp }"
