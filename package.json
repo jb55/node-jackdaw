@@ -6,11 +6,13 @@
   "repository": {
     "url": ""
   },
-  "main": "index.js",
+  "main": "lib/index.js",
   "engines": {
     "node": "~0.6.8"
   },
-  "dependencies": {},
+  "dependencies": {
+    "node-uuid": "*"
+  },
   "devDependencies": {},
   "optionalDependencies": {}
 }
