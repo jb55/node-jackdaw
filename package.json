@@ -2,7 +2,7 @@
   "author": "Bill Casarin <bill@casarin.ca> (jb55.com)",
   "name": "jackdaw",
   "description": "Sentry client for node",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "keywords": ["sentry", "logging", "raven", "jackdaw"],
   "repository": {
     "url": ""
