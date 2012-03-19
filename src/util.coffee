@@ -82,15 +82,15 @@ util.parseStackTrace = (stack, cb) ->
 
   async.map lines, (line, done) ->
     frame = util.parseStackTraceLine line
-    return done null, frame if util.cantGetLineContext frame.filename
+    return done null, frame if not util.canGetLineContext frame.filename
     util.getLineContext frame.filename, frame.lineno, (err, context) ->
       frame = _.extend frame, context
       done err, frame
   , (err, frames) ->
     cb err, frames
 
-util.cantGetLineContext = (f) ->
-  f and f.length > 0 and f[0] isnt '/'
+util.canGetLineContext = (f) ->
+  f and f.length > 0 and f[0] is '/'
 
 #
 # build a sentry stack frame from a raw stack frame
@@ -101,13 +101,13 @@ util.buildStackFrame = (opts, done) ->
   context = context or true
 
   frame =
-    filename: callsite.file
+    filename: callsite.file + (if callsite.isEval then " (eval)" else "")
     abs_path: callsite.path
     lineno: callsite.line
   frame["function"] = callsite.name
 
   if context
-    return done null, frame if util.cantGetLineContext frame.abs_path
+    return done null, frame if not util.canGetLineContext frame.abs_path
     util.getLineContext frame.abs_path, frame.lineno, (err, ctx) ->
       frame = _.extend frame, ctx
       done err, frame

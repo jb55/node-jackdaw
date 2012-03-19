@@ -30,7 +30,7 @@ class Event
 
     [ @timestamp ] = new Date().toISOString().split '.'
 
-  @fromError: (err, message, cb) ->
+  @captureError: (err, message, cb) ->
     event = new Event
 
     unless cb
@@ -110,7 +110,6 @@ class Client
         body: encoded
       , (err, resp, body) ->
         return cb && cb err, resp, body
-
 
 
 ex.Client = Client
