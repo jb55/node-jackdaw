@@ -1,9 +1,18 @@
 {
-  "author": "Bill Casarin <bill@casarin.ca> (jb55.com)",
+  "author": {
+    "name": "Bill Casarin",
+    "email": "bill@casarin.ca",
+    "url": "jb55.com"
+  },
   "name": "jackdaw",
   "description": "Sentry client for node",
-  "version": "0.0.5",
-  "keywords": ["sentry", "logging", "raven", "jackdaw"],
+  "version": "1.0",
+  "keywords": [
+    "sentry",
+    "logging",
+    "raven",
+    "jackdaw"
+  ],
   "repository": {
     "url": ""
   },
@@ -12,12 +21,12 @@
     "node": "~0.6.8"
   },
   "dependencies": {
-      "node-uuid": "*"
-    , "raw-stacktrace": ">=0.0.2"
-    , "request": ">=2.9.0 && <3.0.0"
-    , "underscore": ">=1.3.1 && <1.4"
-    , "async": ">=0.1.0 && <0.2"
+    "node-uuid": "*",
+    "raw-stacktrace": ">=0.0.2",
+    "request": ">=2.9.0 && <3.0.0",
+    "underscore": ">=1.3.1 && <1.4",
+    "async": ">=0.1.0 && <0.2"
   },
   "devDependencies": {},
-  "optionalDependencies": {}
+  "optionalDependencies": {},
 }

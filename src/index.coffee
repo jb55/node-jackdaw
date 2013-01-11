@@ -30,24 +30,9 @@ class Event
 
     [ @timestamp ] = new Date().toISOString().split '.'
 
-  @captureError: (err, message, cb) ->
-    event = new Event
-
-    unless cb
-      cb = message
-      message = null
-
-    event.error err, (e, frames) ->
-      if frames and frames.length > 0
-        event.culprit = util.buildCulprit frames[0]
-      else
-        event.culprit = "Unknown" unless frames
-
-      event.message = message or err.message
-      cb and cb null, event
 
   error: (err, cb) ->
-    @exception err
+    @exception err.name, err.message
     @stacktrace err, cb
     @
 
@@ -58,8 +43,8 @@ class Event
       cb null, frames
     @
 
-  exception: (err) ->
-    @interface "Exception", util.buildException err
+  exception: (type, value) ->
+    @interface "Exception", { type: type, value: value }
     @
 
   interface: (name, data) ->
@@ -77,9 +62,9 @@ class Client
         throw new Error "Invalid DSN"
       opts = util.parseDsn opts
 
-    { uri, public, secret, projectId } = opts
+    { uri, secret, projectId } = opts
     @uri       = uri
-    @public    = public
+    @public    = opts["public"]
     @secret    = secret
     @projectId = projectId
 
@@ -109,8 +94,29 @@ class Client
         method: "POST"
         body: encoded
       , (err, resp, body) ->
-        return cb && cb err, resp, body
+        return cb and cb err, resp, body
 
+  captureMessage: (message, cb) -> @send ex.buildMessage(message), cb
+  captureError: (err, cb) ->
+    ex.buildError err, (error, event) =>
+      @send event, cb
+
+ex.buildMessage = (message) ->
+  event = new jackdaw.Event message: err
+  event.interface "Message", message: err
+  event
+
+ex.buildError = (err, cb) ->
+  event = new Event
+
+  event.error err, (e, frames) ->
+    if frames and frames.length > 0
+      event.culprit = util.buildCulprit frames[0]
+    else
+      event.culprit = "Unknown" unless frames
+
+    event.message = err.message or err
+    cb and cb null, event
 
 ex.Client = Client
 ex.Event = Event

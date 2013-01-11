@@ -14,10 +14,6 @@ var jd     = require('jackdaw')
 // Log all uncaught exceptions to sentry
 //
 process.on('uncaughtException', function(e){
-  jd.Event.fromError(e, function(err, event){
-    client.send(event, function(serr, resp, body) {
-      console.log(serr, resp.statusCode, body);
-    });
-  });
+  client.captureError(e, function(err, resp, body){});
 });
 ```
