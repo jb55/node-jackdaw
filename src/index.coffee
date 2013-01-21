@@ -102,8 +102,8 @@ class Client
       @send event, cb
 
 ex.buildMessage = (message) ->
-  event = new Event message: err
-  event.interface "Message", message: err
+  event = new Event message: message
+  event.interface "Message", message: message
   event
 
 ex.buildError = (err, cb) ->
