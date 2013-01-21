@@ -102,7 +102,7 @@ class Client
       @send event, cb
 
 ex.buildMessage = (message) ->
-  event = new jackdaw.Event message: err
+  event = new Event message: err
   event.interface "Message", message: err
   event
 
