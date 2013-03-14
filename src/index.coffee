@@ -30,6 +30,23 @@ class Event
 
     [ @timestamp ] = new Date().toISOString().split '.'
 
+  http: (req) ->
+    context = {}
+
+    context.body   = req.body if req.body
+    context.params = req.params if req.params
+    context.session = req.session if req.session
+
+    http =
+      url: "#{ req.headers.origin }#{ req.url }"
+      method: req.method
+      data: context
+      query_string: req.query
+      cookies: req.cookies
+      headers: req.headers
+      env: process.env
+
+    @interface "Http", http
 
   error: (err, cb) ->
     @exception err.name, err.message
