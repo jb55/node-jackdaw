@@ -27,6 +27,7 @@ class Event
     @logger   = opts.logger if opts.logger
     @level       = opts.level if opts.level
     @server_name = opts.serverName or os.hostname()
+    @extra       = opts.extra if opts.extra?
 
     [ @timestamp ] = new Date().toISOString().split '.'
 
