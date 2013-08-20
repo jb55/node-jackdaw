@@ -21,12 +21,12 @@ ex = module.exports
 #
 class Event
   constructor: (opts={}) ->
-    @event_id = opts.event_id or uuid().replace /\-/g, ""
-    @culprit  = opts.culprit if opts.culprit
-    @message  = opts.message if opts.message
-    @logger   = opts.logger if opts.logger
-    @level       = opts.level if opts.level
-    @server_name = opts.serverName or os.hostname()
+    @event_id    = opts.event_id ? uuid().replace /\-/g, ""
+    @culprit     = opts.culprit ? "Unknown"
+    @message     = opts.message if opts.message?
+    @logger      = opts.logger if opts.logger?
+    @level       = opts.level if opts.level?
+    @server_name = opts.serverName ? os.hostname()
     @tags        = opts.tags if opts.tags?
     @extra       = opts.extra if opts.extra?
 
